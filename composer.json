@@ -1,0 +1,16 @@
+{
+    "name": "cs267_hw5\\index_program",
+    "description": "HW5 index program",
+    "authors": [
+        {
+            "name": "Kushal Palesha",
+            "email": "kushal.palesha@sjsu.edu"
+        }
+    ],
+    "config": {
+        "secure-http": false
+    },
+    "require": {
+        "seekquarry/yioop": ">=3.3.0"
+    }
+}
