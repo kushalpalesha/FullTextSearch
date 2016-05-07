@@ -18,15 +18,12 @@ function create_index($path, $index_file)
         build_index($lines, $document_id, $dictionary, $document_map);
     }
     ksort($dictionary);
-    //print_r($dictionary);
-    //print_r($document_map);
     $doc_offset_map = [];
-    //TODO: resolve whether we need to store packed things to file
     $packed_doc_map = pack_document_map($document_map, $doc_offset_map);
-    //print_r($doc_offset_map);
     $packed_dict = pack_dict($dictionary, $doc_offset_map);
     $fp = fopen($index_file, "wb");
     $result = fwrite($fp, $packed_dict . $packed_doc_map);
+    fclose($fp);
     if ($result) {
         return 1;
     } else {
@@ -55,8 +52,6 @@ function pack_dict($dictionary, $doc_offset_map)
             $frequency_list[$i] = $doc_offset_map[$postings[$i]][1][$term];
         }
         $compressed_postings = encode_list($delta_list);
-        //print_r($frequency_list);
-        //print("\n" . $term);
         $compressed_frequencies = encode_list($frequency_list);
         $postings_list = $postings_list . pack("N",strlen($compressed_postings))
             . $compressed_postings . pack("N",strlen($compressed_frequencies))
