@@ -6,7 +6,7 @@ if (count($argv) == 3) {
     $index_file = $argv[2];
     $code = create_index($path, $index_file);
     if ($code == 1) {
-        echo "Index created and stored in: " . $index_file;
+        echo "Index created and stored in: " . $index_file . ".idx";
     } else if ($code == 0) {
         echo "No .txt files found at " . $path;
     } else {

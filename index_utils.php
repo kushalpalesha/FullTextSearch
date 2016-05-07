@@ -21,7 +21,7 @@ function create_index($path, $index_file)
     $doc_offset_map = [];
     $packed_doc_map = pack_document_map($document_map, $doc_offset_map);
     $packed_dict = pack_dict($dictionary, $doc_offset_map);
-    $fp = fopen($index_file, "wb");
+    $fp = fopen($index_file . '.idx', "wb");
     $result = fwrite($fp, $packed_dict . $packed_doc_map);
     fclose($fp);
     if ($result) {
