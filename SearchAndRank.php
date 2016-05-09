@@ -1,6 +1,20 @@
 <?php
 namespace cs267_hw5\search_program;
 
+use SplHeap;
+
+class MinHeap extends SplHeap {
+    public function compare($value1, $value2)
+    {
+        list($term1, $docId1) = each($value1);
+        list($term2, $docId2) = each($value2);
+        if ($docId1 === $docId2) {
+            return 0;
+        }
+        return $docId1 < $docId2 ? 1 : -1;
+    }
+}
+
 class SearchAndRank
 {
     private $primary_array;
@@ -33,27 +47,59 @@ class SearchAndRank
         $this->file_pointer = $file_pointer;
     }
 
-    function runQuery($stemmed_query_terms, $relevance_mesaure)
+    public function runQuery($stemmed_query_terms, $relevance_measure)
     {
-        $term = $stemmed_query_terms[0];
-        $postings_offset = $this->binarySearch($term, 1, count($this->primary_array));
-        echo $postings_offset . "\n";
-        //print_r(fstat($this->file_pointer));
-        echo fseek($this->file_pointer, $this->postings_list_start +
-            $postings_offset, SEEK_SET);
-        $read_bytes = fread($this->file_pointer, 4);
-        $size = unpack("N", $read_bytes)[1];
-        $read_bytes = fread($this->file_pointer, $size);
-        $encoded_postings = $read_bytes;
-        $read_bytes = fread($this->file_pointer, 4);
-        $size = unpack("N", $read_bytes)[1];
-        $read_bytes = fread($this->file_pointer, $size);
-        $encoded_frequencies = $read_bytes;
-        print($encoded_frequencies);
+        $result = [];
+        if ($relevance_measure === "BM25") {
+            $result = $this->getRelevantDocsBM25($stemmed_query_terms);
+        } else if ($relevance_measure === "DFR") {
+            $result = $this->getRelevantDocsDFR($stemmed_query_terms);
+        }
+        return $result;
     }
 
-    function binarySearch($term,$low, $high)
+    private function getRelevantDocsBM25($stemmed_query_terms)
     {
+        $k = 20;
+        $bm25Result = [];
+        $resultHeap = new MinHeap();
+        $docIdHeap = new MinHeap();
+        foreach ($stemmed_query_terms as $term) {
+            $term_info = $this->get_term_info($term);
+            if (!is_null($term_info)) {
+                $docIdHeap->insert([$term => $term_info[0][0]]);
+            }
+        }
+    }
+
+    private function get_term_info($term)
+    {
+        $postings_offset = $this->binarySearch($term, 1,
+            count($this->primary_array));
+        if ($postings_offset != -1) {
+            fseek($this->file_pointer, $this->postings_list_start +
+                $postings_offset, SEEK_SET);
+            $read_bytes = fread($this->file_pointer, 4);
+            $size = unpack("N", $read_bytes)[1];
+            $encoded_postings = fread($this->file_pointer, $size);
+            $read_bytes = fread($this->file_pointer, 4);
+            $size = unpack("N", $read_bytes)[1];
+            $encoded_frequencies = fread($this->file_pointer, $size);
+            decode_gamma_code($encoded_postings);
+            decode_gamma_code($encoded_frequencies);
+            //TODO: write gamma code decode function
+            return [, ];
+        } else {
+            return NULL;
+        }
+
+    }
+
+    private function binarySearch($term,$low, $high)
+    {
+        if ($low > $high) {
+            return -1;
+        }
         if ($this->get_term_from_dictionary($low) === $term) {
             $bytes = substr($this->secondary_array, $this->primary_array[$low] + 4
                 + strlen($term), 4);
@@ -76,7 +122,7 @@ class SearchAndRank
         }
     }
 
-    function get_term_from_dictionary($index)
+    private function get_term_from_dictionary($index)
     {
         $offset = $this->primary_array[$index];
         $bytes = substr($this->secondary_array, $offset, 4);
