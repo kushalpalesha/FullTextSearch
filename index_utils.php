@@ -11,15 +11,16 @@ function create_index($path, $index_file)
     if (!$file_list) {
         return 0;
     }
+    $corpus_size = 0;
     foreach ($file_list as $file_name) {
         $lines = file($file_name);
         $file_name = basename($file_name);
         $document_id = substr_replace($file_name, "", -4);
-        build_index($lines, $document_id, $dictionary, $document_map);
+        $corpus_size += build_index($lines, $document_id, $dictionary, $document_map);
     }
     ksort($dictionary);
     $doc_offset_map = [];
-    $packed_doc_map = pack_document_map($document_map, $doc_offset_map);
+    $packed_doc_map = pack_document_map($document_map, $doc_offset_map, $corpus_size);
     $packed_dict = pack_dict($dictionary, $doc_offset_map);
     $fp = fopen($index_file . '.idx', "wb");
     $result = fwrite($fp, $packed_dict . $packed_doc_map);
@@ -81,11 +82,11 @@ function encode_gamma($k)
     return $str;
 }
 
-function pack_document_map($document_map, &$doc_offset_map)
+function pack_document_map($document_map, &$doc_offset_map, $corpus_size)
 {
     $packed_doc_map = "";
     $offset = 0;
-    //TODO:use docoffset map to stroe frequency of each term
+    //TODO:use corpus_size to calculate avg_docLen and store in packed map
     foreach ($document_map as $document_id => $term_list) {
         //ksort($term_list[1]);
         $doc_offset_map[$document_id] = [$offset,$term_list[1]];
@@ -133,4 +134,5 @@ function build_index($lines, $document_id, &$dictionary, &$document_map)
             }
         }
     }
+    return $document_map[$document_id][0];
 }
