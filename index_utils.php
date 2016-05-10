@@ -67,9 +67,20 @@ function pack_dict($dictionary, $doc_offset_map)
 
 function encode_list($list)
 {
+    $coded_string = "";
     $compressed_list = "";
     foreach ($list as $number) {
-        $compressed_list = $compressed_list . encode_gamma($number);
+        $coded_string = $coded_string . encode_gamma($number);
+        while (strlen($coded_string) > 8) {
+            $num = bindec(substr($coded_string, 0, 8));
+            $coded_string = substr($coded_string, 8);
+            $compressed_list = $compressed_list . chr($num);
+        }
+    }
+    if ($coded_string != "") {
+        $coded_string = str_pad($coded_string, 8, "0", STR_PAD_RIGHT);
+        $num = bindec($coded_string);
+        $compressed_list = $compressed_list . chr($num);
     }
     return $compressed_list;
 }
@@ -87,14 +98,11 @@ function pack_document_map($document_map, &$doc_offset_map, $corpus_size)
     $packed_doc_map = "";
     $offset = 0;
     //TODO:use corpus_size to calculate avg_docLen and store in packed map
-    foreach ($document_map as $document_id => $term_list) {
-        //ksort($term_list[1]);
-        $doc_offset_map[$document_id] = [$offset,$term_list[1]];
-        //print_r($term_list);
-        //$serialized = serialize($term_list);
+    foreach ($document_map as $document_id => $doc_info) {
+        $doc_offset_map[$document_id] = [$offset,$doc_info[1]];
         $doc_id_len = strlen($document_id);
         $serialized_len = strlen($serialized);
-        $packed = pack("N",$doc_id_len).$document_id.pack("N",$term_list[0]);
+        $packed = pack("N",$doc_id_len).$document_id.pack("N",$doc_info[0]);
         $pack_len = strlen($packed);
         $packed_doc_map = $packed_doc_map . $packed;
         $offset = $offset + $pack_len;
