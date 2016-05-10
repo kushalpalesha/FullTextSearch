@@ -18,10 +18,12 @@ function create_index($path, $index_file)
         $document_id = substr_replace($file_name, "", -4);
         $corpus_size += build_index($lines, $document_id, $dictionary, $document_map);
     }
+    $avg_doc_len = $corpus_size/count($file_list);
     ksort($dictionary);
     $doc_offset_map = [];
     $packed_doc_map = pack_document_map($document_map, $doc_offset_map, $corpus_size);
     $packed_dict = pack_dict($dictionary, $doc_offset_map);
+    $packed_dict = pack("N", floor($avg_doc_len)) . $packed_dict;
     $fp = fopen($index_file . '.idx', "wb");
     $result = fwrite($fp, $packed_dict . $packed_doc_map);
     fclose($fp);
@@ -70,7 +72,7 @@ function encode_list($list)
     $coded_string = "";
     $compressed_list = "";
     foreach ($list as $number) {
-        $coded_string = $coded_string . encode_gamma($number);
+        $coded_string = $coded_string . encode_gamma($number + 1);
         while (strlen($coded_string) > 8) {
             $num = bindec(substr($coded_string, 0, 8));
             $coded_string = substr($coded_string, 8);

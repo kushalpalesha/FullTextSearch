@@ -22,11 +22,14 @@ class SearchAndRank
     private $postings_list_start;
     private $document_map_start;
     private $file_pointer;
+    private $avg_doc_len;
 
-    // constructor reads the primary array and sets pointers to index elements
+    // constructor reads the dictionary in memory and sets pointers to index elements
     function __construct($file_pointer)
     {
-        $curr_pointer = 0;
+        $read_bytes = fread($file_pointer, 4);
+        $this->avg_doc_len = unpack("N", $read_bytes)[1];
+        $curr_pointer = 4;
         $read_bytes = fread($file_pointer, 4);
         $size = unpack("N", $read_bytes)[1];
         $read_bytes = fread($file_pointer, $size);
@@ -85,6 +88,7 @@ class SearchAndRank
             $read_bytes = fread($this->file_pointer, 4);
             $size = unpack("N", $read_bytes)[1];
             $encoded_frequencies = fread($this->file_pointer, $size);
+            //TODO: remember to subtract one from each entry when decoding postings
             decode_gamma_code($encoded_postings);
             decode_gamma_code($encoded_frequencies);
             //TODO: write gamma code decode function
