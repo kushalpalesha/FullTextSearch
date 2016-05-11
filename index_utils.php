@@ -18,12 +18,13 @@ function create_index($path, $index_file)
         $document_id = substr_replace($file_name, "", -4);
         $corpus_size += build_index($lines, $document_id, $dictionary, $document_map);
     }
-    $avg_doc_len = $corpus_size/count($file_list);
+    $no_of_docs = count($file_list);
+    $avg_doc_len = $corpus_size/$no_of_docs;
     ksort($dictionary);
     $doc_offset_map = [];
     $packed_doc_map = pack_document_map($document_map, $doc_offset_map, $corpus_size);
     $packed_dict = pack_dict($dictionary, $doc_offset_map);
-    $packed_dict = pack("N", floor($avg_doc_len)) . $packed_dict;
+    $packed_dict = pack("N", $no_of_docs) . pack("N", floor($avg_doc_len)) . $packed_dict;
     $fp = fopen($index_file . '.idx', "wb");
     $result = fwrite($fp, $packed_dict . $packed_doc_map);
     fclose($fp);
@@ -103,8 +104,7 @@ function pack_document_map($document_map, &$doc_offset_map, $corpus_size)
     foreach ($document_map as $document_id => $doc_info) {
         $doc_offset_map[$document_id] = [$offset,$doc_info[1]];
         $doc_id_len = strlen($document_id);
-        $serialized_len = strlen($serialized);
-        $packed = pack("N",$doc_id_len).$document_id.pack("N",$doc_info[0]);
+        $packed = pack("N",$doc_id_len) . $document_id . pack("N",$doc_info[0]);
         $pack_len = strlen($packed);
         $packed_doc_map = $packed_doc_map . $packed;
         $offset = $offset + $pack_len;
