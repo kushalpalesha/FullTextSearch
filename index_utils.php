@@ -72,6 +72,7 @@ function encode_list($list)
     $coded_string = "";
     $compressed_list = "";
     foreach ($list as $number) {
+        // adding 1 before encoding. should be subtracted after decoding
         $coded_string = $coded_string . encode_gamma($number + 1);
         while (strlen($coded_string) > 8) {
             $num = bindec(substr($coded_string, 0, 8));
@@ -99,7 +100,6 @@ function pack_document_map($document_map, &$doc_offset_map, $corpus_size)
 {
     $packed_doc_map = "";
     $offset = 0;
-    //TODO:use corpus_size to calculate avg_docLen and store in packed map
     foreach ($document_map as $document_id => $doc_info) {
         $doc_offset_map[$document_id] = [$offset,$doc_info[1]];
         $doc_id_len = strlen($document_id);
