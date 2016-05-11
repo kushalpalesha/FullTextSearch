@@ -4,14 +4,14 @@ namespace cs267_hw5\search_program;
 use SplHeap;
 
 class MinHeap extends SplHeap {
-    public function compare($value1, $value2)
+    public function compare($pair1, $pair2)
     {
-        list($term1, $docId1) = each($value1);
-        list($term2, $docId2) = each($value2);
-        if ($docId1 === $docId2) {
+        list($key1, $value1) = each($pair1);
+        list($key1, $value2) = each($pair2);
+        if ($value1 === $value2) {
             return 0;
         }
-        return $docId1 < $docId2 ? 1 : -1;
+        return $value1 < $value2 ? 1 : -1;
     }
 }
 
@@ -22,14 +22,17 @@ class SearchAndRank
     private $postings_list_start;
     private $document_map_start;
     private $file_pointer;
+    private $no_of_docs;
     private $avg_doc_len;
 
-    // constructor reads the dictionary in memory and sets pointers to index elements
+    // reads the dictionary in memory and sets pointers to index elements
     function __construct($file_pointer)
     {
         $read_bytes = fread($file_pointer, 4);
+        $this->no_of_docs = unpack("N", $read_bytes)[1];
+        $read_bytes = fread($file_pointer, 4);
         $this->avg_doc_len = unpack("N", $read_bytes)[1];
-        $curr_pointer = 4;
+        $curr_pointer = 8;
         $read_bytes = fread($file_pointer, 4);
         $size = unpack("N", $read_bytes)[1];
         $read_bytes = fread($file_pointer, $size);
@@ -54,30 +57,102 @@ class SearchAndRank
     {
         $result = [];
         if ($relevance_measure === "BM25") {
-            $result = $this->get_relevant_docs_BM25($stemmed_query_terms);
+            $result = $this->get_relevant_docs_bm25($stemmed_query_terms);
         } else if ($relevance_measure === "DFR") {
-            $result = $this->get_relevant_docs_DFR($stemmed_query_terms);
+            $result = $this->get_relevant_docs_dfr($stemmed_query_terms);
         }
         return $result;
     }
 
-    private function get_relevant_docs_BM25($stemmed_query_terms)
+    private function get_relevant_docs_bm25($stemmed_query_terms)
     {
         $k = 20;
-        $bm25Result = [];
-        $resultHeap = new MinHeap();
-        $docIdHeap = new MinHeap();
-        $term_info_map = get_term_info_map($stemmed_query_terms);
+        $bm25_result = [];
+        $result_heap = new MinHeap();
+        $doc_offset_heap = new MinHeap();
+        $term_info_map = [];
         foreach ($stemmed_query_terms as $term) {
             if (!key_exists($term, $term_info_map)) {
-                $term_info = get_term_info($term);
+                $term_info = $this->get_term_info($term);
                 $term_info_map[$term] = $term_info;
             }
-            $term_info = $term_info_map[$term];
-            if (!is_null($term_info)) {
-                $docIdHeap->insert([$term => $doc_offset);
+            if (!is_null($term_info_map[$term])) {
+                $doc_offset_heap->insert([$term => key($term_info_map[$term])]);
+                next($term_info_map[$term]);
             }
         }
+        $doc_offset_map = [];
+        while (each($doc_offset_heap->top())[1] != INF) {
+            $score = 0;
+            $doc_offset = each($doc_offset_heap->top())[1];
+            // maps offset to doc_id and doc_len doc_offset => [doc_id, doc_len]
+            while (each($doc_offset_heap->top())[1] == $doc_offset) {
+                $term = each($doc_offset_heap->extract())[0];
+                $doc_count = count($term_info_map[$term]);
+                $freq_in_doc = $term_info_map[$term][$doc_offset];
+                if (!key_exists($doc_offset, $doc_offset_map)) {
+                    $doc_info = $this->read_doc_info($doc_offset);
+                    $doc_offset_map[$doc_offset] = $doc_info;
+                }
+                $doc_len = $doc_offset_map[$doc_offset][1];
+                $score = $score + $this->bm25_score($this->no_of_docs,
+                    $doc_count, $freq_in_doc, $doc_len, $this->avg_doc_len);
+                $next_doc_offset = INF;
+                if (key($term_info_map[$term]) != NULL) {
+                    $next_doc_offset = key($term_info_map[$term]);
+                }
+                $doc_offset_heap->insert([$term => $next_doc_offset]);
+                next($term_info_map[$term]);
+            }
+            if ($result_heap->count() < $k) {
+                $result_heap->insert([$doc_offset => $score]);
+            } else if ($score > each($result_heap->top())[1]) {
+                $result_heap->extract();
+                $result_heap->insert([$doc_offset => $score]);
+            }
+        }
+        while($result_heap->valid()) {
+            list($doc_offset, $score) = each($result_heap->extract());
+            $bm25_result[$doc_offset_map[$doc_offset][0]] = $score;
+        }
+        arsort($bm25_result);
+        return $bm25_result;
+    }
+
+    /*
+    b = 0.75
+    k1 = 1.2
+    */
+    private function bm25_score($corpus_size, $doc_count, $freq_in_doc,
+        $doc_len, $avg_doc_len)
+    {
+        $idf = $this->calculate_idf($corpus_size, $doc_count);
+        $tf = ($freq_in_doc * (1.2 + 1))/
+              ($freq_in_doc + 1.2 *
+              ((1 - 0.75) + 0.75 * ($doc_len/$avg_doc_len)));
+        $result = $idf * $tf;
+        return $result;
+    }
+
+    function calculate_idf($corpus_size, $doc_count)
+    {
+        $result = 0.0;
+        if ($doc_count != 0) {
+            $result = log(($corpus_size/$doc_count),2);
+        }
+        return $result;
+    }
+
+    private function read_doc_info($doc_offset)
+    {
+        fseek($this->file_pointer, $this->document_map_start +
+            $doc_offset, SEEK_SET);
+        $read_bytes = fread($this->file_pointer, 4);
+        $size = unpack("N", $read_bytes)[1];
+        $doc_id = fread($this->file_pointer, $size);
+        $read_bytes = fread($this->file_pointer, 4);
+        $doc_len = unpack("N", $read_bytes)[1];
+        return [$doc_id, $doc_len];
     }
 
     private function get_term_info($term)
@@ -85,6 +160,7 @@ class SearchAndRank
         $postings_offset = $this->binary_search($term, 1,
             count($this->primary_array));
         if ($postings_offset != -1) {
+            // setting file pointer to the position of posting list
             fseek($this->file_pointer, $this->postings_list_start +
                 $postings_offset, SEEK_SET);
             $read_bytes = fread($this->file_pointer, 4);
@@ -93,9 +169,9 @@ class SearchAndRank
             $read_bytes = fread($this->file_pointer, 4);
             $size = unpack("N", $read_bytes)[1];
             $encoded_frequencies = fread($this->file_pointer, $size);
-            $delta_list = decode_gamma_code($encoded_postings);
-            $posting_list = delta_to_posting($delta_list);
-            $frequency_list = decode_gamma_code($encoded_frequencies);
+            $delta_list = $this->decode_gamma_code($encoded_postings);
+            $posting_list = $this->delta_to_posting($delta_list);
+            $frequency_list = $this->decode_gamma_code($encoded_frequencies);
             $term_info = array_combine($posting_list, $frequency_list);
             return $term_info;
         } else {
@@ -105,7 +181,8 @@ class SearchAndRank
 
     private function decode_gamma_code($encoded_string)
     {
-        $binary_stream = charstream_to_binarystream($encoded_string);
+        $binary_stream = $this->charstream_to_binarystream($encoded_string);
+        echo $binary_stream;
         $list = [];
         $count=0;
         while ($i<strlen($binary_stream)) {
@@ -136,8 +213,11 @@ class SearchAndRank
 
     private function delta_to_posting($delta_list)
     {
-        for ($i = 1; i < count($delta_list); $i++) {
-            $delta_list[i] = $delta_list[i-1] + $delta_list[i];
+        $len = count($delta_list);
+        if ($len > 1) {
+            for ($i = 1; $i < $len; $i++) {
+                $delta_list[$i] = $delta_list[$i-1] + $delta_list[$i];
+            }
         }
         return $delta_list;
     }

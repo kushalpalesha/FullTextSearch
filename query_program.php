@@ -15,6 +15,7 @@ if (count($argv) == 4) {
         $search = new SearchAndRank($file_pointer);
         $stemmed_query_terms = tokenize($query);
         $results = $search->runQuery($stemmed_query_terms, $relevance_measure);
+        print_r($results);
         exit();
     } else if (!$file_pointer){
         echo "Invalid index file name " . $argv[1];
