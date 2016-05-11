@@ -10,7 +10,7 @@ if (count($argv) == 3) {
     } else if ($code == 0) {
         echo "No .txt files found at " . $path;
     } else {
-        echo "An error occured trying to write index file";
+        echo "An error occurred trying to write index file";
     }
 } else {
     echo "usage : search_program.php path_to_folder_to_index index_filename";

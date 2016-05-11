@@ -1,6 +1,5 @@
 <?php
 namespace cs267_hw5\search_program;
-error_reporting(E_ALL);
 require_once "index_utils.php";
 require_once "SearchAndRank.php";
 $measures = ["BM25", "DFR"];
@@ -21,5 +20,5 @@ if (count($argv) == 4) {
         echo "Invalid index file name " . $argv[1];
     }
 }
-print("\nusage : query_program.php index_filename query relevance_mesaure
-        relevance_mesaure -> BM25 | DFR");
+print("\n usage : query_program.php index_filename query relevance_measure
+        relevance_measure -> BM25 | DFR");

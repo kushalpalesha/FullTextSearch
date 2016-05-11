@@ -7,7 +7,7 @@ class MinHeap extends SplHeap {
     public function compare($pair1, $pair2)
     {
         list($key1, $value1) = each($pair1);
-        list($key1, $value2) = each($pair2);
+        list($key2, $value2) = each($pair2);
         if ($value1 === $value2) {
             return 0;
         }
@@ -182,17 +182,17 @@ class SearchAndRank
     private function decode_gamma_code($encoded_string)
     {
         $binary_stream = $this->charstream_to_binarystream($encoded_string);
-        echo $binary_stream;
         $list = [];
-        $count=0;
-        while ($i<strlen($binary_stream)) {
-            if ($binary_stream[$i]==0) {
-                $count+=1;
-                $i+=1;
+        $count = 0;
+        $i = 0;
+        while ($i < strlen($binary_stream)) {
+            if ($binary_stream[$i] == 0) {
+                $count += 1;
+                $i += 1;
             } else {
-                $list[] = bindec(substr($binary_stream,$i,$count+1)) - 1;
-                $i+=$count+1;
-                $count=0;
+                $list[] = bindec(substr($binary_stream, $i, $count + 1)) - 1;
+                $i += $count + 1;
+                $count = 0;
             }
         }
         return $list;
@@ -236,7 +236,7 @@ class SearchAndRank
                 + strlen($term), 4);
             return unpack("N", $bytes)[1];
         }
-        $mid = ceil(($high + $low)/2);
+        $mid = (int) ceil(($high + $low)/2);
         $mid_term = $this->get_term_from_dictionary($mid);
         if ($mid_term === $term) {
             $bytes = substr($this->secondary_array, $this->primary_array[$mid] + 4
@@ -246,6 +246,8 @@ class SearchAndRank
             return $this->binary_search($term, $low, $mid-1);
         } else if (strcmp($mid_term, $term) < 0) {
             return $this->binary_search($term, $mid+1, $high);
+        } else {
+            return -1;
         }
     }
 

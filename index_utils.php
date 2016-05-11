@@ -22,7 +22,7 @@ function create_index($path, $index_file)
     $avg_doc_len = $corpus_size/$no_of_docs;
     ksort($dictionary);
     $doc_offset_map = [];
-    $packed_doc_map = pack_document_map($document_map, $doc_offset_map, $corpus_size);
+    $packed_doc_map = pack_document_map($document_map, $doc_offset_map);
     $packed_dict = pack_dict($dictionary, $doc_offset_map);
     $packed_dict = pack("N", $no_of_docs) . pack("N", floor($avg_doc_len)) . $packed_dict;
     $fp = fopen($index_file . '.idx', "wb");
@@ -97,7 +97,7 @@ function encode_gamma($k)
     return $str;
 }
 
-function pack_document_map($document_map, &$doc_offset_map, $corpus_size)
+function pack_document_map($document_map, &$doc_offset_map)
 {
     $packed_doc_map = "";
     $offset = 0;
@@ -123,8 +123,8 @@ function tokenize($line)
 function build_index($lines, $document_id, &$dictionary, &$document_map)
 {
     foreach ($lines as $line) {
-        $wordlist = tokenize($line);
-        foreach ($wordlist as $term) {
+        $word_list = tokenize($line);
+        foreach ($word_list as $term) {
             //dictionary
             if (!key_exists($term, $dictionary)) {
                 $dictionary[$term] = [$document_id];
