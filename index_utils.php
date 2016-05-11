@@ -51,8 +51,8 @@ function pack_dict($dictionary, $doc_offset_map)
         $delta_list = [$doc_offset_map[$postings[0]][0]];
         $frequency_list = [$doc_offset_map[$postings[0]][1][$term]];
         for ($i = 1; $i < count($postings); $i++) {
-            $delta_list[$i] = $doc_offset_map[$postings[$i][0]] -
-                $doc_offset_map[$postings[$i-1][0]];
+            $delta_list[$i] = $doc_offset_map[$postings[$i]][0] -
+                $doc_offset_map[$postings[$i-1]][0];
             $frequency_list[$i] = $doc_offset_map[$postings[$i]][1][$term];
         }
         $compressed_postings = encode_list($delta_list);
@@ -102,7 +102,7 @@ function pack_document_map($document_map, &$doc_offset_map, $corpus_size)
     $packed_doc_map = "";
     $offset = 0;
     foreach ($document_map as $document_id => $doc_info) {
-        $doc_offset_map[$document_id] = [$offset,$doc_info[1]];
+        $doc_offset_map[$document_id] = [$offset, $doc_info[1]];
         $doc_id_len = strlen($document_id);
         $packed = pack("N",$doc_id_len) . $document_id . pack("N",$doc_info[0]);
         $pack_len = strlen($packed);
@@ -128,7 +128,7 @@ function build_index($lines, $document_id, &$dictionary, &$document_map)
             //dictionary
             if (!key_exists($term, $dictionary)) {
                 $dictionary[$term] = [$document_id];
-            } else if (!in_array($document_id, $dictionary[$term])){
+            } else if (!in_array($document_id, $dictionary[$term])) {
                 $dictionary[$term][] = $document_id;
             }
             //document map
