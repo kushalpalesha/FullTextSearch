@@ -19,12 +19,11 @@ function create_index($path, $index_file)
         $corpus_size += build_index($lines, $document_id, $dictionary, $document_map);
     }
     $no_of_docs = count($file_list);
-    $avg_doc_len = $corpus_size/$no_of_docs;
     ksort($dictionary);
     $doc_offset_map = [];
     $packed_doc_map = pack_document_map($document_map, $doc_offset_map);
     $packed_dict = pack_dict($dictionary, $doc_offset_map);
-    $packed_dict = pack("N", $no_of_docs) . pack("N", floor($avg_doc_len)) . $packed_dict;
+    $packed_dict = pack("N", $no_of_docs) . pack("N", $corpus_size) . $packed_dict;
     $fp = fopen($index_file . '.idx', "wb");
     $result = fwrite($fp, $packed_dict . $packed_doc_map);
     fclose($fp);
@@ -44,22 +43,19 @@ function pack_dict($dictionary, $doc_offset_map)
     $postings_list_offset = 0;
     foreach ($dictionary as $term => $postings) {
         $primary_array = $primary_array . pack("N", $secondary_array_offset);
-        $secondary_array = $secondary_array . pack("N",strlen($term)) . $term .
-            pack("N",$postings_list_offset);
+        $secondary_array = $secondary_array . pack("N",strlen($term)) . $term . pack("N",$postings_list_offset);
         $secondary_array_offset = strlen($secondary_array);
         // build delta list from postings
         $delta_list = [$doc_offset_map[$postings[0]][0]];
         $frequency_list = [$doc_offset_map[$postings[0]][1][$term]];
         for ($i = 1; $i < count($postings); $i++) {
-            $delta_list[$i] = $doc_offset_map[$postings[$i]][0] -
-                $doc_offset_map[$postings[$i-1]][0];
+            $delta_list[$i] = $doc_offset_map[$postings[$i]][0] - $doc_offset_map[$postings[$i-1]][0];
             $frequency_list[$i] = $doc_offset_map[$postings[$i]][1][$term];
         }
         $compressed_postings = encode_list($delta_list);
         $compressed_frequencies = encode_list($frequency_list);
-        $postings_list = $postings_list . pack("N",strlen($compressed_postings))
-            . $compressed_postings . pack("N",strlen($compressed_frequencies))
-            . $compressed_frequencies;
+        $postings_list = $postings_list . pack("N",strlen($compressed_postings)) . $compressed_postings
+            . pack("N",strlen($compressed_frequencies)) . $compressed_frequencies;
         $postings_list_offset = strlen($postings_list);
     }
     $primary_array = pack("N", strlen($primary_array)) . $primary_array;
@@ -104,7 +100,7 @@ function pack_document_map($document_map, &$doc_offset_map)
     foreach ($document_map as $document_id => $doc_info) {
         $doc_offset_map[$document_id] = [$offset, $doc_info[1]];
         $doc_id_len = strlen($document_id);
-        $packed = pack("N",$doc_id_len) . $document_id . pack("N",$doc_info[0]);
+        $packed = pack("N", $doc_id_len) . $document_id . pack("N",$doc_info[0]);
         $pack_len = strlen($packed);
         $packed_doc_map = $packed_doc_map . $packed;
         $offset = $offset + $pack_len;

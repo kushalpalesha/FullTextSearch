@@ -23,6 +23,7 @@ class SearchAndRank
     private $document_map_start;
     private $file_pointer;
     private $no_of_docs;
+    private $corpus_size;
     private $avg_doc_len;
 
     // reads the dictionary in memory and sets pointers to index elements
@@ -31,7 +32,8 @@ class SearchAndRank
         $read_bytes = fread($file_pointer, 4);
         $this->no_of_docs = unpack("N", $read_bytes)[1];
         $read_bytes = fread($file_pointer, 4);
-        $this->avg_doc_len = unpack("N", $read_bytes)[1];
+        $this->corpus_size = unpack("N", $read_bytes)[1];
+        $this->avg_doc_len = $this->corpus_size/$this->no_of_docs;
         $curr_pointer = 8;
         $read_bytes = fread($file_pointer, 4);
         $size = unpack("N", $read_bytes)[1];
@@ -62,6 +64,12 @@ class SearchAndRank
             $result = $this->get_relevant_docs_dfr($stemmed_query_terms);
         }
         return $result;
+    }
+
+    private function get_relevant_docs_dfr($stemmed_query_terms)
+    {
+        $dfr_result = [];
+        return $dfr_result;
     }
 
     private function get_relevant_docs_bm25($stemmed_query_terms)
@@ -95,8 +103,8 @@ class SearchAndRank
                     $doc_offset_map[$doc_offset] = $doc_info;
                 }
                 $doc_len = $doc_offset_map[$doc_offset][1];
-                $score = $score + $this->bm25_score($this->no_of_docs,
-                    $doc_count, $freq_in_doc, $doc_len, $this->avg_doc_len);
+                $score = $score + $this->bm25_score($this->no_of_docs, $doc_count, $freq_in_doc,
+                        $doc_len, $this->avg_doc_len);
                 $next_doc_offset = INF;
                 if (key($term_info_map[$term]) != NULL) {
                     $next_doc_offset = key($term_info_map[$term]);
@@ -123,8 +131,7 @@ class SearchAndRank
     b = 0.75
     k1 = 1.2
     */
-    private function bm25_score($corpus_size, $doc_count, $freq_in_doc,
-        $doc_len, $avg_doc_len)
+    private function bm25_score($corpus_size, $doc_count, $freq_in_doc, $doc_len, $avg_doc_len)
     {
         $idf = $this->calculate_idf($corpus_size, $doc_count);
         $tf = ($freq_in_doc * (1.2 + 1))/
@@ -145,8 +152,7 @@ class SearchAndRank
 
     private function read_doc_info($doc_offset)
     {
-        fseek($this->file_pointer, $this->document_map_start +
-            $doc_offset, SEEK_SET);
+        fseek($this->file_pointer, $this->document_map_start + $doc_offset, SEEK_SET);
         $read_bytes = fread($this->file_pointer, 4);
         $size = unpack("N", $read_bytes)[1];
         $doc_id = fread($this->file_pointer, $size);
@@ -161,8 +167,7 @@ class SearchAndRank
             count($this->primary_array));
         if ($postings_offset != -1) {
             // setting file pointer to the position of posting list
-            fseek($this->file_pointer, $this->postings_list_start +
-                $postings_offset, SEEK_SET);
+            fseek($this->file_pointer, $this->postings_list_start + $postings_offset, SEEK_SET);
             $read_bytes = fread($this->file_pointer, 4);
             $size = unpack("N", $read_bytes)[1];
             $encoded_postings = fread($this->file_pointer, $size);
@@ -228,19 +233,16 @@ class SearchAndRank
             return -1;
         }
         if ($this->get_term_from_dictionary($low) === $term) {
-            $bytes = substr($this->secondary_array, $this->primary_array[$low] + 4
-                + strlen($term), 4);
+            $bytes = substr($this->secondary_array, $this->primary_array[$low] + 4 + strlen($term), 4);
             return unpack("N", $bytes)[1];
         } else if ($this->get_term_from_dictionary($high) === $term) {
-            $bytes = substr($this->secondary_array, $this->primary_array[$high] + 4
-                + strlen($term), 4);
+            $bytes = substr($this->secondary_array, $this->primary_array[$high] + 4 + strlen($term), 4);
             return unpack("N", $bytes)[1];
         }
         $mid = (int) ceil(($high + $low)/2);
         $mid_term = $this->get_term_from_dictionary($mid);
         if ($mid_term === $term) {
-            $bytes = substr($this->secondary_array, $this->primary_array[$mid] + 4
-                + strlen($term), 4);
+            $bytes = substr($this->secondary_array, $this->primary_array[$mid] + 4 + strlen($term), 4);
             return unpack("N", $bytes)[1];
         } else if (strcmp($mid_term, $term) > 0) {
             return $this->binary_search($term, $low, $mid-1);
