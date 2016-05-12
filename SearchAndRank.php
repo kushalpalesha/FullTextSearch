@@ -15,6 +15,8 @@ class MinHeap extends SplHeap {
     }
 }
 
+define("mu", 1000, true);
+
 class SearchAndRank
 {
     private $primary_array;
@@ -25,7 +27,6 @@ class SearchAndRank
     private $no_of_docs;
     private $corpus_size;
     private $avg_doc_len;
-
     // reads the dictionary in memory and sets pointers to index elements
     function __construct($file_pointer)
     {
@@ -60,16 +61,78 @@ class SearchAndRank
         $result = [];
         if ($relevance_measure === "BM25") {
             $result = $this->get_relevant_docs_bm25($stemmed_query_terms);
-        } else if ($relevance_measure === "DFR") {
-            $result = $this->get_relevant_docs_dfr($stemmed_query_terms);
+        } else if ($relevance_measure === "LMD") {
+            $result = $this->get_relevant_docs_lmd($stemmed_query_terms);
         }
         return $result;
     }
 
-    private function get_relevant_docs_dfr($stemmed_query_terms)
+    private function get_relevant_docs_lmd($stemmed_query_terms)
     {
-        $dfr_result = [];
-        return $dfr_result;
+        $k = 20;
+        $lmd_result = [];
+        $result_heap = new MinHeap();
+        $doc_offset_heap = new MinHeap();
+        $term_info_map = [];
+        foreach ($stemmed_query_terms as $term) {
+            if (!key_exists($term, $term_info_map)) {
+                $term_info = $this->get_term_info($term);
+                $term_info_map[$term] = $term_info;
+            }
+            if (!is_null($term_info_map[$term])) {
+                $doc_offset_heap->insert([$term => key($term_info_map[$term])]);
+                next($term_info_map[$term]);
+            }
+        }
+        $doc_offset_map = [];
+        $term_count_map = [];
+        $query_freq_arr = array_count_values($stemmed_query_terms);
+        $n = count($stemmed_query_terms);
+        while (each($doc_offset_heap->top())[1] != INF) {
+            $score = 0;
+            $doc_offset = each($doc_offset_heap->top())[1];
+            // maps offset to doc_id and doc_len doc_offset => [doc_id, doc_len]
+            while (each($doc_offset_heap->top())[1] == $doc_offset) {
+                $term = each($doc_offset_heap->extract())[0];
+                $freq_in_doc = $term_info_map[$term][$doc_offset];
+                if (!key_exists($term, $term_count_map)) {
+                    $frequencies = array_values($term_info_map[$term]);
+                    $term_count_map[$term] = array_sum($frequencies);
+                }
+                if (!key_exists($doc_offset, $doc_offset_map)) {
+                    $doc_info = $this->read_doc_info($doc_offset);
+                    $doc_offset_map[$doc_offset] = $doc_info;
+                }
+                $doc_len = $doc_offset_map[$doc_offset][1];
+                $score = $score + $this->lmd_score($query_freq_arr[$term], $freq_in_doc, $this->corpus_size,
+                        $term_count_map[$term], $n, $doc_len, $this->avg_doc_len);
+                $next_doc_offset = INF;
+                if (key($term_info_map[$term]) != NULL) {
+                    $next_doc_offset = key($term_info_map[$term]);
+                }
+                $doc_offset_heap->insert([$term => $next_doc_offset]);
+                next($term_info_map[$term]);
+            }
+            if ($result_heap->count() < $k) {
+                $result_heap->insert([$doc_offset => $score]);
+            } else if ($score > each($result_heap->top())[1]) {
+                $result_heap->extract();
+                $result_heap->insert([$doc_offset => $score]);
+            }
+        }
+        while($result_heap->valid()) {
+            list($doc_offset, $score) = each($result_heap->extract());
+            $lmd_result[$doc_offset_map[$doc_offset][0]] = $score;
+        }
+        arsort($lmd_result);
+        return $lmd_result;
+    }
+
+    private function lmd_score($q_t, $f_td, $l_C, $l_t, $n, $l_d, $l_avg)
+    {
+        $f_td_norm = $f_td * log(1 + ($l_avg / $l_d));
+        $result = $q_t * log(1 + ($f_td_norm / mu) * ($l_C / $l_t)) - $n * log(1 + $l_d/mu);
+        return $result;
     }
 
     private function get_relevant_docs_bm25($stemmed_query_terms)
