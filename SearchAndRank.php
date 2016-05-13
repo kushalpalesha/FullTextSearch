@@ -18,7 +18,9 @@ class MinHeap extends SplHeap {
 define("mu", 1000, true);
 define("k1", 1.2, true);
 define("b", 0.75, true);
-
+//TODO: read only one doc entry at a time
+//TODO: read only one posting list at a time
+//TODO: process queries conjunctively
 class SearchAndRank
 {
     private $primary_array;
