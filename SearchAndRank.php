@@ -16,6 +16,8 @@ class MinHeap extends SplHeap {
 }
 
 define("mu", 1000, true);
+define("k1", 1.2, true);
+define("b", 0.75, true);
 
 class SearchAndRank
 {
@@ -97,9 +99,12 @@ class SearchAndRank
                     $doc_count = count($term_info_map[$term]);
                     $score = $score + $this->bm25_score($this->no_of_docs, $doc_count, $freq_in_doc,
                             $doc_len, $this->avg_doc_len);
-                } else if($relevance_measure === "LMD") {
+                } else if ($relevance_measure === "LMD") {
                     $score = $score + $this->lmd_score($query_freq_arr[$term], $freq_in_doc, $this->corpus_size,
                             $term_count_map[$term], $n, $doc_len, $this->avg_doc_len);
+                } else if ($relevance_measure === "DFR") {
+                    $score = $score + $this->dfr_score($query_freq_arr[$term], $freq_in_doc, $term_count_map[$term],
+                            $doc_len, $this->avg_doc_len, $this->no_of_docs);
                 }
 
                 $next_doc_offset = INF;
@@ -124,11 +129,19 @@ class SearchAndRank
         return $result;
     }
 
+    private function dfr_score($q_t, $f_td, $l_t, $l_d, $l_avg, $no_of_docs)
+    {
+        $f_td_norm = $f_td * log(1 + ($l_avg / $l_d));
+        $result = $q_t * (log(1 + ($l_t / $no_of_docs)) + $f_td_norm * log(1 + ($no_of_docs / $l_t))
+            / $f_td_norm + 1);
+        return $result;
+    }
+
     private function lmd_score($q_t, $f_td, $l_C, $l_t, $n, $l_d, $l_avg)
     {
         $f_td_norm = $f_td * log(1 + ($l_avg / $l_d));
-        $result = $q_t * log(1 + ($f_td_norm / mu) * ($l_C / $l_t)) - $n * log(1 + $l_d/mu);
-        return $result;
+        $result = $q_t * log(1 + ($f_td_norm / mu) * ($l_C / $l_t)) - $n * log(1 + ($l_d/mu));
+        return -$result;
     }
 
     /*
@@ -138,9 +151,9 @@ class SearchAndRank
     private function bm25_score($corpus_size, $doc_count, $freq_in_doc, $doc_len, $avg_doc_len)
     {
         $idf = $this->calculate_idf($corpus_size, $doc_count);
-        $tf = ($freq_in_doc * (1.2 + 1))/
-              ($freq_in_doc + 1.2 *
-              ((1 - 0.75) + 0.75 * ($doc_len/$avg_doc_len)));
+        $tf = ($freq_in_doc * (k1 + 1))/
+              ($freq_in_doc + k1 *
+              ((1 - b) + b * ($doc_len/$avg_doc_len)));
         $result = $idf * $tf;
         return $result;
     }
