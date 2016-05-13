@@ -13,7 +13,16 @@ if (count($argv) == 4) {
         $search = new SearchAndRank($file_pointer);
         $stemmed_query_terms = tokenize($query);
         $results = $search->runQuery($stemmed_query_terms, $relevance_measure);
-        print_r($results);
+        if ($results) {
+            $rank = 1;
+            // printing output in trec_eval_top format. Hard coding query_id
+            foreach ($results as $docId => $value) {
+                print(1 . " " . 0 . " " . $docId . " " . $rank . " " . $value . " my_test\n");
+                $rank += 1;
+            }
+        } else {
+            print("\nNo search results found\n");
+        }
         fclose($file_pointer);
         exit();
     } else if (!$file_pointer){
