@@ -14,7 +14,8 @@ function create_index($path, $index_file)
     $corpus_size = 0;
     foreach ($file_list as $file_name) {
         $lines = file($file_name);
-        $document_id = basename($file_name, ".txt");
+        $file_name = basename($file_name);
+        $document_id = substr_replace($file_name, "", -4);
         $corpus_size += build_index($lines, $document_id, $dictionary, $document_map);
     }
     $no_of_docs = count($file_list);
