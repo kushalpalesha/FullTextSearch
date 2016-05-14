@@ -32,6 +32,10 @@ class SearchAndRank
     private $corpus_size;
     private $avg_doc_len;
     // reads the dictionary in memory and sets pointers to index elements
+    /**
+     * SearchAndRank constructor.
+     * @param $file_pointer
+     */
     function __construct($file_pointer)
     {
         $read_bytes = fread($file_pointer, 4);
@@ -60,9 +64,14 @@ class SearchAndRank
         $this->file_pointer = $file_pointer;
     }
 
+    /**
+     * @param $stemmed_query_terms
+     * @param $relevance_measure
+     * @return array
+     */
     public function runQuery($stemmed_query_terms, $relevance_measure)
     {
-        $k = 20;
+        $k = 10;
         $result = [];
         $result_heap = new MinHeap();
         $doc_offset_heap = new MinHeap();
@@ -92,11 +101,12 @@ class SearchAndRank
                     $frequencies = array_values($term_info_map[$term]);
                     $term_count_map[$term] = array_sum($frequencies);
                 }
+                $doc_len = 0;
                 if (!key_exists($doc_offset, $doc_offset_map)) {
                     $doc_info = $this->read_doc_info($doc_offset);
-                    $doc_offset_map[$doc_offset] = $doc_info;
+                    $doc_offset_map[$doc_offset] = $doc_info[0];
+                    $doc_len = $doc_info[1];
                 }
-                $doc_len = $doc_offset_map[$doc_offset][1];
                 if ($relevance_measure === "BM25") {
                     $doc_count = count($term_info_map[$term]);
                     $score = $score + $this->bm25_score($this->no_of_docs, $doc_count, $freq_in_doc,
@@ -125,12 +135,21 @@ class SearchAndRank
         }
         while($result_heap->valid()) {
             list($doc_offset, $score) = each($result_heap->extract());
-            $result[$doc_offset_map[$doc_offset][0]] = $score;
+            $result[$doc_offset_map[$doc_offset]] = $score;
         }
         arsort($result);
         return $result;
     }
 
+    /**
+     * @param $q_t
+     * @param $f_td
+     * @param $l_t
+     * @param $l_d
+     * @param $l_avg
+     * @param $no_of_docs
+     * @return mixed
+     */
     private function dfr_score($q_t, $f_td, $l_t, $l_d, $l_avg, $no_of_docs)
     {
         $f_td_norm = $f_td * log(1 + ($l_avg / $l_d));
@@ -139,17 +158,31 @@ class SearchAndRank
         return $result;
     }
 
+    /**
+     * @param $q_t
+     * @param $f_td
+     * @param $l_C
+     * @param $l_t
+     * @param $n
+     * @param $l_d
+     * @param $l_avg
+     * @return float
+     */
     private function lmd_score($q_t, $f_td, $l_C, $l_t, $n, $l_d, $l_avg)
     {
         $f_td_norm = $f_td * log(1 + ($l_avg / $l_d));
         $result = $q_t * log(1 + ($f_td_norm / mu) * ($l_C / $l_t)) - $n * log(1 + ($l_d/mu));
-        return -$result;
+        return $result;
     }
 
-    /*
-    b = 0.75
-    k1 = 1.2
-    */
+    /**
+     * @param $corpus_size
+     * @param $doc_count
+     * @param $freq_in_doc
+     * @param $doc_len
+     * @param $avg_doc_len
+     * @return float
+     */
     private function bm25_score($corpus_size, $doc_count, $freq_in_doc, $doc_len, $avg_doc_len)
     {
         $idf = $this->calculate_idf($corpus_size, $doc_count);
@@ -160,6 +193,11 @@ class SearchAndRank
         return $result;
     }
 
+    /**
+     * @param $corpus_size
+     * @param $doc_count
+     * @return float
+     */
     function calculate_idf($corpus_size, $doc_count)
     {
         $result = 0.0;
@@ -169,6 +207,10 @@ class SearchAndRank
         return $result;
     }
 
+    /**
+     * @param $doc_offset
+     * @return array
+     */
     private function read_doc_info($doc_offset)
     {
         fseek($this->file_pointer, $this->document_map_start + $doc_offset, SEEK_SET);
@@ -180,6 +222,10 @@ class SearchAndRank
         return [$doc_id, $doc_len];
     }
 
+    /**
+     * @param $term
+     * @return array|null
+     */
     private function get_term_info($term)
     {
         $postings_offset = $this->binary_search($term, 1,
@@ -203,6 +249,10 @@ class SearchAndRank
         }
     }
 
+    /**
+     * @param $encoded_string
+     * @return array
+     */
     private function decode_gamma_code($encoded_string)
     {
         $binary_stream = $this->charstream_to_binarystream($encoded_string);
@@ -222,6 +272,10 @@ class SearchAndRank
         return $list;
     }
 
+    /**
+     * @param $encoded_string
+     * @return string
+     */
     private function charstream_to_binarystream($encoded_string)
     {
         $binaryStream = "";
@@ -235,6 +289,10 @@ class SearchAndRank
         return $binaryStream;
     }
 
+    /**
+     * @param $delta_list
+     * @return mixed
+     */
     private function delta_to_posting($delta_list)
     {
         $len = count($delta_list);
@@ -246,7 +304,13 @@ class SearchAndRank
         return $delta_list;
     }
 
-    private function binary_search($term,$low, $high)
+    /**
+     * @param $term
+     * @param $low
+     * @param $high
+     * @return int
+     */
+    private function binary_search($term, $low, $high)
     {
         if ($low > $high) {
             return -1;
@@ -272,6 +336,10 @@ class SearchAndRank
         }
     }
 
+    /**
+     * @param $index
+     * @return string
+     */
     private function get_term_from_dictionary($index)
     {
         $offset = $this->primary_array[$index];
